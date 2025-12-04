@@ -339,6 +339,15 @@ func TestAddressParsing(t *testing.T) {
 				},
 			},
 		},
+		{
+			`Joán Krčmárik <joan@example.com>`,
+			[]*Address{
+				{
+					Name:    `Joán Krčmárik`,
+					Address: "joan@example.com",
+				},
+			},
+		},
 	}
 	for _, test := range tests {
 		if len(test.exp) == 1 {
