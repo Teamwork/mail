@@ -817,13 +817,20 @@ var atextChars = []byte("ABCDEFGHIJKLMNOPQRSTUVWXYZ" +
 	"0123456789" +
 	"!#$%&'*+-/=?^_`{|}~")
 
-// isAtext returns true if c is an RFC 5322 atext character.
+// isAtext returns true if c is an RFC 5322 atext character, or a UTF-8 byte
+// (for RFC 6532 internationalized email support).
 // If dot is true, period is included.
 func isAtext(c byte, dot bool) bool {
 	if dot && c == '.' {
 		return true
 	}
-	return bytes.IndexByte(atextChars, c) >= 0
+	// Support ASCII atext characters
+	if bytes.IndexByte(atextChars, c) >= 0 {
+		return true
+	}
+	// Support UTF-8 characters (RFC 6532)
+	// Allow any byte >= 0x80 which could be part of a UTF-8 sequence
+	return c >= 0x80
 }
 
 // isQtext returns true if c is an RFC 5322 qtext character.
