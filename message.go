@@ -58,6 +58,7 @@ import (
 	"time"
 	"unicode"
 
+	"golang.org/x/text/encoding/charmap"
 	qp "gopkg.in/alexcesaro/quotedprintable.v3"
 )
 
@@ -102,6 +103,20 @@ func (m *Message) mimeVersion() string {
 	return m.GetHeader("Mime-Version")
 }
 
+func newQpDecoder() *qp.WordDecoder {
+	dec := new(qp.WordDecoder)
+	dec.CharsetReader = func(charset string, input io.Reader) (io.Reader, error) {
+		if strings.ToLower(charset) == "iso-8859-2" {
+			// Return a reader that decodes from ISO-8859-2 to UTF-8
+			return charmap.ISO8859_2.NewDecoder().Reader(input), nil
+		}
+		// Fallback for other charsets or errors
+		return nil, fmt.Errorf("unknown charset: %s", charset)
+	}
+	return dec
+
+}
+
 // GetHeader returns the undecoded value of header if found. To access the
 // raw (potentially encoded) value of header, use the Message.Header.
 func (m *Message) GetHeader(header string) string {
@@ -109,7 +124,7 @@ func (m *Message) GetHeader(header string) string {
 	if e == "" {
 		return ""
 	}
-	dec := new(qp.WordDecoder)
+	dec := newQpDecoder()
 	decoded, err := dec.DecodeHeader(e)
 	if err != nil {
 		return ""
@@ -121,7 +136,7 @@ func (m *Message) GetMultipleHeaderValues(header string) (values []string) {
 	headers := textproto.MIMEHeader(m.Header)
 	list := headers[header]
 	for _, v := range list {
-		dec := new(qp.WordDecoder)
+		dec := newQpDecoder()
 		decoded, err := dec.DecodeHeader(v)
 		if err != nil {
 			continue

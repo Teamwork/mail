@@ -210,6 +210,26 @@ func TestAddressParsingError(t *testing.T) {
 	}
 }
 
+func TestHeaderISO88592Parser(t *testing.T) {
+	s := `From: John Doe <jdoe@machine.example>
+To: Mary Smith <mary@example.net>
+Subject: =?iso-8859-2?Q?Brak_zam=F3wie=F1_w_wf-mag_Aquarius?=
+Date: Fri, 21 Nov 1997 09:55:06 -0600
+Message-ID: <1234@local.machine.example>
+
+This is a message just to say hello.
+So, "Hello".
+`
+	message, err := ReadMessage(bytes.NewBuffer([]byte(s)))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if message.GetHeader("Subject") != "Brak zamówień w wf-mag Aquarius" {
+		t.Fatal(`expected 'Brak zamówień w wf-mag Aquarius', aot`, message.GetHeader("Subject"))
+	}
+}
+
 func TestAddressParsing(t *testing.T) {
 	tests := []struct {
 		addrsStr string
