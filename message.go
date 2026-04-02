@@ -336,32 +336,7 @@ func (m *Message) Bytes() []byte {
 	//
 	// Body
 	//
-	boundary := m.boundary()
-	// If we have a boundary, we need to read line by line to ensure
-	// the body has an opening and closing boundary
-	if boundary != "" {
-		scanner := bufio.NewScanner(m.Body)
-		open, closed := false, false
-		for scanner.Scan() {
-			line := scanner.Text()
-			output.WriteString(line)
-			output.WriteString(crlf)
-			if open && line == "--"+boundary+"--" {
-				closed = true
-			}
-
-			if line == "--"+boundary {
-				open = true
-			}
-		}
-
-		if open && !closed {
-			output.WriteString("--" + boundary + "--")
-			output.WriteString(crlf)
-		}
-	} else {
-		output.ReadFrom(m.Body)
-	}
+	output.ReadFrom(m.Body)
 
 	return output.Bytes()
 }
