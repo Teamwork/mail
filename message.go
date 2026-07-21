@@ -58,7 +58,8 @@ import (
 	"time"
 	"unicode"
 
-	"golang.org/x/text/encoding/charmap"
+	"golang.org/x/text/encoding/htmlindex"
+	"golang.org/x/text/encoding/ianaindex"
 	qp "gopkg.in/alexcesaro/quotedprintable.v3"
 )
 
@@ -106,12 +107,18 @@ func (m *Message) mimeVersion() string {
 func newQpDecoder() *qp.WordDecoder {
 	dec := new(qp.WordDecoder)
 	dec.CharsetReader = func(charset string, input io.Reader) (io.Reader, error) {
-		if strings.ToLower(charset) == "iso-8859-2" {
-			// Return a reader that decodes from ISO-8859-2 to UTF-8
-			return charmap.ISO8859_2.NewDecoder().Reader(input), nil
+		// Resolve the charset against the full WHATWG/IANA registries so we
+		// handle windows-1252, iso-8859-*, koi8, shift_jis, etc. rather than
+		// only iso-8859-2. utf-8/iso-8859-1/us-ascii are handled by the caller
+		// before we're reached, so this only sees the "other" charsets.
+		enc, err := htmlindex.Get(charset)
+		if err != nil {
+			enc, err = ianaindex.MIME.Encoding(charset)
 		}
-		// Fallback for other charsets or errors
-		return nil, fmt.Errorf("unknown charset: %s", charset)
+		if err != nil || enc == nil {
+			return nil, fmt.Errorf("unknown charset: %s", charset)
+		}
+		return enc.NewDecoder().Reader(input), nil
 	}
 	return dec
 
@@ -127,7 +134,9 @@ func (m *Message) GetHeader(header string) string {
 	dec := newQpDecoder()
 	decoded, err := dec.DecodeHeader(e)
 	if err != nil {
-		return ""
+		// Decoding failed (e.g. an unknown charset); fall back to the raw
+		// value rather than dropping a non-empty header.
+		return e
 	}
 	return decoded
 }
@@ -139,6 +148,9 @@ func (m *Message) GetMultipleHeaderValues(header string) (values []string) {
 		dec := newQpDecoder()
 		decoded, err := dec.DecodeHeader(v)
 		if err != nil {
+			// Decoding failed (e.g. an unknown charset); keep the raw value
+			// rather than dropping a non-empty header.
+			values = append(values, v)
 			continue
 		}
 		values = append(values, decoded)

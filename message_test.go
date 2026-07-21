@@ -230,6 +230,53 @@ So, "Hello".
 	}
 }
 
+// Outlook encodes subjects with smart punctuation (en/em-dashes, curly quotes,
+// …) as Windows-1252 encoded-words. These must decode rather than be dropped.
+func TestHeaderWindows1252Parser(t *testing.T) {
+	s := `From: Grace Jung <gjung@audiology.org>
+To: Yoko Co. Support <support@yokoco.com>
+Subject: =?Windows-1252?Q?AAA2027_Website_Launch_=96_July_16_?=
+Date: Thu, 9 Jul 2026 21:24:34 +0000
+Message-ID: <1234@local.machine.example>
+
+body
+`
+	message, err := ReadMessage(bytes.NewBuffer([]byte(s)))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// =96 in Windows-1252 is an en-dash (U+2013).
+	if got, want := message.GetHeader("Subject"), "AAA2027 Website Launch – July 16 "; got != want {
+		t.Fatalf("Subject: got %q, want %q", got, want)
+	}
+}
+
+// A message with an empty Subject header followed by a real Windows-1252 one
+// (as produced for some Yoxel/Outlook mail) must yield the real subject, not an
+// empty list. Previously the encoded-word was dropped on a decode error.
+func TestGetMultipleHeaderValuesWindows1252(t *testing.T) {
+	s := `From: Sam Carlson <scarlson@apwa.org>
+To: Yoko Co. Support <support@yokoco.com>
+Subject: =?Windows-1252?Q?APWA_Ad_Partner_Transition=97Info_Needed?=
+Date: Mon, 22 Jun 2026 17:32:05 +0000
+Message-ID: <5678@local.machine.example>
+Subject:
+
+body
+`
+	message, err := ReadMessage(bytes.NewBuffer([]byte(s)))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	values := message.GetMultipleHeaderValues("Subject")
+	// =97 in Windows-1252 is an em-dash (U+2014).
+	if len(values) == 0 || values[0] != "APWA Ad Partner Transition—Info Needed" {
+		t.Fatalf("Subject values: got %#v, want first == %q", values, "APWA Ad Partner Transition—Info Needed")
+	}
+}
+
 func TestAddressParsing(t *testing.T) {
 	tests := []struct {
 		addrsStr string
