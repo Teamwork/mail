@@ -1,4 +1,4 @@
-module github.com/Teamwork/mail
+module github.com/teamwork/mail
 
 go 1.24.0
 
